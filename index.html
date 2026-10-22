@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>쇼핑 리스트</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f5f7;
+    --card-bg: #ffffff;
+    --text: #1d1d1f;
+    --sub: #6e6e73;
+    --accent: #0071e3;
+    --danger: #ff3b30;
+    --border: #e5e5ea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .app {
+    width: 100%;
+    max-width: 480px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--sub);
+    font-size: 14px;
+    margin: 0 0 20px;
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  #item-input {
+    flex: 1;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 16px;
+    background: var(--card-bg);
+    color: var(--text);
+    outline: none;
+  }
+  #item-input:focus {
+    border-color: var(--accent);
+  }
+  #add-btn {
+    padding: 12px 18px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #add-btn:hover { opacity: 0.9; }
+  #add-btn:active { transform: scale(0.97); }
+
+  .list-card {
+    background: var(--card-bg);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  ul#list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li.item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  li.item:last-child { border-bottom: none; }
+
+  .checkbox {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .checkbox.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .checkbox.checked::after {
+    content: "✓";
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .item-text {
+    flex: 1;
+    font-size: 16px;
+    word-break: break-word;
+  }
+  .item-text.checked {
+    text-decoration: line-through;
+    color: var(--sub);
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 6px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .delete-btn:hover { opacity: 0.7; }
+
+  .empty-state {
+    padding: 40px 16px;
+    text-align: center;
+    color: var(--sub);
+    font-size: 15px;
+  }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    padding: 0 4px;
+    color: var(--sub);
+    font-size: 13px;
+  }
+  #clear-checked {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+  }
+  #clear-checked:hover { text-decoration: underline; }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --card-bg: #1c1c1e;
+      --text: #f5f5f7;
+      --sub: #98989d;
+      --border: #38383a;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <h1>🛒 쇼핑 리스트</h1>
+    <p class="subtitle">사야 할 것들을 추가하고, 다 사면 체크하세요.</p>
+
+    <div class="input-row">
+      <input id="item-input" type="text" placeholder="예: 우유, 계란, 사과..." autocomplete="off">
+      <button id="add-btn">추가</button>
+    </div>
+
+    <div class="list-card">
+      <ul id="list"></ul>
+    </div>
+
+    <div class="footer">
+      <span id="count-text"></span>
+      <button id="clear-checked">완료 항목 지우기</button>
+    </div>
+  </div>
+
+<script>
+const STORAGE_KEY = "shopping-list-items";
+
+function loadItems() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveItems(items) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {}
+}
+
+let items = loadItems();
+
+const listEl = document.getElementById("list");
+const inputEl = document.getElementById("item-input");
+const addBtn = document.getElementById("add-btn");
+const countText = document.getElementById("count-text");
+const clearCheckedBtn = document.getElementById("clear-checked");
+
+function render() {
+  listEl.innerHTML = "";
+
+  if (items.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "리스트가 비어 있어요. 아이템을 추가해 보세요!";
+    listEl.appendChild(empty);
+  } else {
+    items.forEach((item) => {
+      const li = document.createElement("li");
+      li.className = "item";
+
+      const checkbox = document.createElement("div");
+      checkbox.className = "checkbox" + (item.checked ? " checked" : "");
+      checkbox.addEventListener("click", () => toggleItem(item.id));
+
+      const text = document.createElement("span");
+      text.className = "item-text" + (item.checked ? " checked" : "");
+      text.textContent = item.name;
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "delete-btn";
+      deleteBtn.textContent = "×";
+      deleteBtn.addEventListener("click", () => deleteItem(item.id));
+
+      li.appendChild(checkbox);
+      li.appendChild(text);
+      li.appendChild(deleteBtn);
+      listEl.appendChild(li);
+    });
+  }
+
+  const total = items.length;
+  const done = items.filter((i) => i.checked).length;
+  countText.textContent = total === 0 ? "" : `${done} / ${total} 완료`;
+}
+
+function addItem() {
+  const name = inputEl.value.trim();
+  if (!name) return;
+  items.push({ id: Date.now() + Math.random(), name, checked: false });
+  saveItems(items);
+  inputEl.value = "";
+  inputEl.focus();
+  render();
+}
+
+function toggleItem(id) {
+  items = items.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i));
+  saveItems(items);
+  render();
+}
+
+function deleteItem(id) {
+  items = items.filter((i) => i.id !== id);
+  saveItems(items);
+  render();
+}
+
+function clearChecked() {
+  items = items.filter((i) => !i.checked);
+  saveItems(items);
+  render();
+}
+
+addBtn.addEventListener("click", addItem);
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") addItem();
+});
+clearCheckedBtn.addEventListener("click", clearChecked);
+
+render();
+</script>
+</body>
+</html>
